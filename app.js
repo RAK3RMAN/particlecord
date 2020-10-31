@@ -46,6 +46,12 @@ if (!config_storage.has('discord_bot_channel') || config_storage.get('discord_bo
     invalid_config = true;
 }
 
+//Config value: discord_bot_prefix
+if (!config_storage.has('discord_bot_prefix') || config_storage.get('discord_bot_prefix') === '') {
+    config_storage.set('discord_bot_prefix', '!');
+    spinner.warn('"discord_bot_prefix" value in config.json set to default: !');
+}
+
 //Config value: webhook_secret
 if (!config_storage.has('webhook_secret') || config_storage.get('webhook_secret') === '') {
     let new_secret = uuidv4();
@@ -58,6 +64,9 @@ if (!config_storage.has('api_port') || config_storage.get('api_port') === '') {
     config_storage.set('api_port', 3000);
     spinner.warn('"api_port" value in config.json set to default: 3000');
 }
+
+//Create variables for pass-through between API and Discord bot
+let last_alert_device_id = '';
 
 //Exit if the config values are not set properly
 if (invalid_config) {
@@ -74,20 +83,67 @@ const bot = new eris.Client(config_storage.get('discord_bot_token'));
 //When the bot is connected and ready, update console
 bot.on('ready', () => {
     spinner.succeed('Connected to Discord API');
-    spinner.succeed(`${chalk.blue('Particlecord')} ready and listening`);
+    spinner.succeed(`${chalk.blue('Particlecord')} listening for ${chalk.yellow('API')} and ${chalk.cyan('Discord')} events`);
 });
 
 //Every time a message is created in the Discord server
 bot.on('messageCreate', async (msg) => {
-    if (msg.content === '!ping') {
+    //Get Discord prefix
+    let pre = config_storage.get('discord_bot_prefix');
+    //Split message into components
+    let parts = msg.content.split(' ');
+    if (parts[0] === pre + 'help') {
         try {
-            await msg.channel.createMessage('pong');
+            await msg.channel.createMessage('**Particlecord commands**\n' +
+                '> ' + pre + 'help: Displays all Particlecord commands\n' +
+                '> ' + pre + 'status: Returns more details from the last alert\n' +
+                '> ' + pre + 'details <device_id>: Returns all details for a Particle device_id\n' +
+                '> ' + pre + 'alert_freq <freq_in_min>: Sets the alert frequency in terms of minutes, use 0 for verbose alerts\n' +
+                '> ' + pre + 'name <device_id> <friendly_name>: Changes the friendly name for a Particle device_id\n');
         } catch (err) {
-            console.warn('Failed to respond to comment');
-            console.warn(err);
+            spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+        }
+    } else if (parts[0]=== pre + 'status') {
+        try {
+            if (last_alert_device_id === '') {
+                await msg.channel.createMessage('An alert has not occurred yet');
+            } else {
+                await msg.channel.createMessage(get_status(last_alert_device_id));
+            }
+        } catch (err) {
+            spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+            console.log(err);
+        }
+    } else if (parts[0] === pre + 'details') {
+        try {
+            await msg.channel.createMessage(get_status(parts[1]));
+        } catch (err) {
+            spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+            console.log(err);
         }
     }
 });
+
+//Create a prettified status message for Discord
+function get_status(device_id) {
+    if (devices_storage.has(device_id)) {
+        let device = devices_storage.get(device_id);
+        return '**Device Details: ' + device.device_name + ' **(' + device_id + ')\n' +
+            '> Batt Level | ' + device.data.loc.batt + "%\n" +
+            '> Cell Strength | ' + device.data.loc.cell + '%\n' +
+            '> Event Trigger | ' + device.data.trig + '\n' +
+            '> GPS Coords | Lat: ' + device.data.loc.lat + ', ' +
+            'Long: ' + device.data.loc.lon + '\n' +
+            '> GPS Accuracy | Vert: ' + device.data.loc.v_acc + " m, " +
+            'Hori: ' + device.data.loc.h_acc + " m\n" +
+            '> Altitude | ' + device.data.loc.alt + " m\n" +
+            '> Heading | ' + device.data.loc.hd + "°\n" +
+            '> Temp | ' + (Math.round(((device.data.loc.temp*(9/5))+32)*100)/100) + "°F\n" +
+            ' http://maps.apple.com/maps?q=' + device.data.loc.lat + ',' + device.data.loc.lon + '\n';
+    } else {
+        return 'Particle device_id does not exist'
+    }
+}
 
 //Handle any errors that the bot encounters
 bot.on('error', err => {
@@ -143,9 +199,12 @@ app.post("/api/particle/trackerone", (req, res) => {
             if (moment().isAfter(moment(device.last_alert_update).add(device.alert_freq_min, 'm'))) {
                 device.last_alert_update = moment();
                 spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid and is past the alert frequency, sending alert`);
-                let message = device.device_name + check_reason + moment().format('MM/DD/YY h:mm:ss a') + " http://maps.apple.com/maps?q=" + device.data.loc.lat + "," + device.data.loc.lon + "";
+                //Send message to Discord
+                let message = device.device_name + check_reason + moment().format('MM/DD/YY h:mm:ss a');
                 bot.createMessage(config_storage.get('discord_bot_channel'), message);
-                spinner.info(`${chalk.cyan('DISCORD')}: ${chalk.yellow('API /api/particle/trackerone')} triggered message send to channel "` + message + `"`);
+                spinner.info(`${chalk.cyan('Discord')}: ${chalk.yellow('API /api/particle/trackerone')} triggered message send to channel "` + message + `"`);
+                //Prepare for status call on Discord
+                last_alert_device_id = req.body.coreid;
             } else {
                 spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid but not past the alert frequency, skipping alert`);
             }
@@ -164,7 +223,7 @@ app.post("/api/particle/trackerone", (req, res) => {
         spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Updated data for device`);
         res.status(200).end();
     } else {
-        spinner.warn(`${chalk.yellow('API')}: Unauthorized POST request`);
+        spinner.warn(`${chalk.yellow('API /api/particle/trackerone')}: Unauthorized POST request`);
         res.status(403).end();
     }
 })
