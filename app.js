@@ -27,29 +27,29 @@ console.log(chalk.white('--> Github: ' + pkg.homepage + '\n'));
 //Setup config.json database
 spinner.start('Checking configuration');
 let dataStore = require('data-store');
-let storage = new dataStore({path: './config.json'});
+let config_storage = new dataStore({path: './config.json'});
 let invalid_config = false;
 
 //Config value: discord_bot_token
-let discord_bot_token = storage.get('discord_bot_token');
+let discord_bot_token = config_storage.get('discord_bot_token');
 if (discord_bot_token === undefined || discord_bot_token === '') {
-    storage.set('discord_bot_token', '');
+    config_storage.set('discord_bot_token', '');
     spinner.fail('Please configure the "discord_bot_token" value in config.json');
     invalid_config = true;
 }
 
 //Config value: webhook_secret
-let webhook_secret = storage.get('webhook_secret');
+let webhook_secret = config_storage.get('webhook_secret');
 if (webhook_secret === undefined || webhook_secret === '') {
     let new_secret = uuidv4();
-    storage.set('webhook_secret', new_secret);
+    config_storage.set('webhook_secret', new_secret);
     spinner.warn('"webhook_secret" value in config.json set default: ' + new_secret);
 }
 
 //Config value: api_port
-let api_port = storage.get('api_port');
+let api_port = config_storage.get('api_port');
 if (api_port === undefined || api_port === '') {
-    storage.set('api_port', 3000);
+    config_storage.set('api_port', 3000);
     spinner.warn('"api_port" value in config.json set to default: 3000');
 }
 
@@ -61,40 +61,20 @@ if (invalid_config) {
 }
 //End of Packages and configuration - - - - - - - - - -
 
-//API Webhooks - - - - - - - - - - - - - - - - - - - -
-//Setup express
-const app = express();
-app.use(bodyParser.json());
-
-//Define routes
-app.post("/particle", (req, res) => {
-    console.log(req.body);
-    res.status(200).end();
-})
-
-//Start express on defined port
-app.listen(storage.get('api_port'), () => spinner.succeed('API webserver running on port ' + storage.get('api_port')))
-
-//End of API Webhooks - - - - - - - - - - - - - - - - -
-
 //Discord integration - - - - - - - - - - - - - - - - -
 //Create a new client instance with eris
-const bot = new eris.Client(storage.get('discord_bot_token'));
+const bot = new eris.Client(config_storage.get('discord_bot_token'));
 
 //When the bot is connected and ready, update console
 bot.on('ready', () => {
     spinner.succeed('Connected to Discord API');
+    console.log("");
+    spinner.succeed(`${chalk.blue('Particlecord')} ready and listening`);
 });
 
-//Every time a message is sent mentioning the bot
+//Every time a message is created in the Discord server
 bot.on('messageCreate', async (msg) => {
-    const botWasMentioned = msg.mentions.find(
-        mentionedUser => mentionedUser.id === bot.user.id,
-    );
-    if (botWasMentioned) {
-
-    }
-    if (msg.content === 'ping') {
+    if (msg.content === '!ping') {
         try {
             await msg.channel.createMessage('pong');
         } catch (err) {
@@ -108,8 +88,26 @@ bot.on('messageCreate', async (msg) => {
 bot.on('error', err => {
     console.warn(err);
 });
-
-//Start Discord bot
-spinner.start('Attempting to connect to Discord API');
-bot.connect();
 //End of Discord integration - - - - - - - - - - - - -
+
+//API Webhooks - - - - - - - - - - - - - - - - - - - -
+//Setup express
+const app = express();
+app.use(bodyParser.json());
+
+//Define routes
+app.post("/api/particle", (req, res) => {
+    console.log(req.body);
+    res.status(200).end();
+})
+
+//Start express on defined port
+spinner.start('Attempting to start API webserver');
+app.listen(config_storage.get('api_port'), function () {
+    //Successfully started webserver
+    spinner.succeed('API webserver running on port ' + config_storage.get('api_port'));
+    //Start Discord bot
+    spinner.start('Attempting to connect to Discord API');
+    bot.connect();
+})
+//End of API Webhooks - - - - - - - - - - - - - - - - -
