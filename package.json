@@ -1,0 +1,29 @@
+{
+  "name": "particlecord",
+  "version": "1.0.0",
+  "description": "A Discord bot that monitors Particle.io events using Node.js",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "node app.js test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RAK3RMAN/particlecord.git"
+  },
+  "author": "RAk3rman",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/RAK3RMAN/particlecord/issues"
+  },
+  "homepage": "https://github.com/RAK3RMAN/particlecord#readme",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "chalk": "^4.1.0",
+    "data-store": "^4.0.3",
+    "eris": "^0.13.3",
+    "express": "^4.17.1",
+    "ora": "^5.1.0",
+    "uuid": "^8.3.1"
+  }
+}
