@@ -248,7 +248,7 @@ app.use(bodyParser.json());
 app.post("/api/particle/trackerone", (req, res) => {
     spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: Received POST request, parsing data`);
     //Make sure we are authenticated
-    if (req.body.api_key !== config_storage.get('webhook_secret')) {
+    if (req.body.api_key === config_storage.get('webhook_secret')) {
         //Make sure trig is not from GPS lock
         let check_reason = "false";
         //Loop through trigger reasons
