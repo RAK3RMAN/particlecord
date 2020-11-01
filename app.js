@@ -321,9 +321,9 @@ app.post("/api/particle/trackerone", (req, res) => {
 //Start express on defined port
 spinner.start('Attempting to start API webserver');
 const key = fs.readFileSync('./dev-https-key.pem');
-const cert = fs.readFileSync('./dev-https.pem');
+const cert = fs.readFileSync('./dev-https-cert.pem');
 let server = https.createServer({key, cert}, app);
-server.listen(config_storage.get('console_port'), () => {
+server.listen(config_storage.get('api_port'), () => {
     //Successfully started webserver
     spinner.succeed('API webserver running on port ' + config_storage.get('api_port') + ' using https');
     //Start Discord bot
