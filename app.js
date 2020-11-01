@@ -16,8 +16,6 @@ const chalk = require('chalk');
 const pkg = require('./package.json');
 const ora = require('ora');
 const spinner = ora('');
-const https = require('https');
-const fs = require('fs');
 
 //Initialize exit options for testing environments
 let exitOpt = require('./exit_options.js');
@@ -320,12 +318,9 @@ app.post("/api/particle/trackerone", (req, res) => {
 
 //Start express on defined port
 spinner.start('Attempting to start API webserver');
-const key = fs.readFileSync('./dev-https-key.pem');
-const cert = fs.readFileSync('./dev-https-cert.pem');
-let server = https.createServer({key, cert}, app);
-server.listen(config_storage.get('api_port'), () => {
+app.listen(config_storage.get('api_port'), function () {
     //Successfully started webserver
-    spinner.succeed('API webserver running on port ' + config_storage.get('api_port') + ' using https');
+    spinner.succeed('API http webserver running on port ' + config_storage.get('api_port'));
     //Start Discord bot
     spinner.start('Attempting to connect to Discord API');
     bot.connect();
