@@ -16,6 +16,8 @@ const chalk = require('chalk');
 const pkg = require('./package.json');
 const ora = require('ora');
 const spinner = ora('');
+const https = require('https');
+const fs = require('fs');
 
 //Initialize exit options for testing environments
 let exitOpt = require('./exit_options.js');
@@ -83,7 +85,7 @@ const bot = new eris.Client(config_storage.get('discord_bot_token'));
 //When the bot is connected and ready, update console
 bot.on('ready', () => {
     spinner.succeed('Connected to Discord API');
-    spinner.succeed(`${chalk.blue('Particlecord')} listening for ${chalk.yellow('API')} and ${chalk.cyan('Discord')} events`);
+    spinner.succeed(`${chalk.blue.bold('Particlecord')} listening for ${chalk.yellow('API')} and ${chalk.cyan('Discord')} events`);
 });
 
 //Every time a message is created in the Discord server
@@ -318,9 +320,12 @@ app.post("/api/particle/trackerone", (req, res) => {
 
 //Start express on defined port
 spinner.start('Attempting to start API webserver');
-app.listen(config_storage.get('api_port'), function () {
+const key = fs.readFileSync('./dev-https-key.pem');
+const cert = fs.readFileSync('./dev-https.pem');
+let server = https.createServer({key, cert}, app);
+server.listen(config_storage.get('console_port'), () => {
     //Successfully started webserver
-    spinner.succeed('API webserver running on port ' + config_storage.get('api_port'));
+    spinner.succeed('API webserver running on port ' + config_storage.get('api_port') + ' using https');
     //Start Discord bot
     spinner.start('Attempting to connect to Discord API');
     bot.connect();
