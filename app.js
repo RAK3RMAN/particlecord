@@ -248,68 +248,75 @@ app.use(bodyParser.json());
 app.post("/api/particle/trackerone", (req, res) => {
     spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: Received POST request, parsing data`);
     //Make sure we are authenticated
-    if (req.body.api_key === config_storage.get('webhook_secret')) {
-        //Get device data
-        let device = devices_storage.get(req.body.coreid);
-        if (device === undefined) {
-            device = {};
-            spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Creating new device in devices.json`);
-        }
-        device.data = JSON.parse(req.body.data);
-
-        //Make sure device_name, alert_freq_min, last_alert_update exists for device
-        if (device.alert_freq_min === undefined) {
-            device.alert_freq_min = 60;
-            spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) "alert_freq_min" set to default: ` + device.alert_freq_min);
-        }
-        if (device.device_name === undefined) {
-            device.device_name = req.body.coreid;
-            spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) "device_name" set to default: ` + device.device_name);
-        }
-        if (device.last_alert_update === undefined) {
-            device.last_alert_update = moment();
-            spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) "last_alert_update" set to default: ` + device.last_alert_update);
-        }
-
-        //Check to see if we need to send update
+    if (req.body.api_key !== config_storage.get('webhook_secret')) {
+        //Make sure trig is not from GPS lock
         let check_reason = "false";
         //Loop through trigger reasons
-        for (let sent_reason of device.data.trig) {
+        for (let sent_reason of JSON.parse(req.body.data).trig) {
             if (sent_reason === "radius") {
                 check_reason = " has changed in GPS location at ";
             } else if (sent_reason === "imu_m" || sent_reason === "img_g") {
                 check_reason = " has been moved physically at ";
+            } else if (sent_reason === "lock") {
+                check_reason = "lock";
             }
         }
-        //If the trigger reason is valid, check to see if we can send an alert
-        if (check_reason !== "false") {
-            //Send an alert if the freq has passed
-            if (moment().isAfter(moment(device.last_alert_update).add(device.alert_freq_min, 'm'))) {
-                device.last_alert_update = moment();
-                spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid and is past the alert frequency, sending alert`);
-                //Send message to Discord
-                let message = '@everyone ' + device.device_name + check_reason + moment().format('MM/DD/YY h:mm:ss a');
-                bot.createMessage(config_storage.get('discord_bot_channel'), message);
-                spinner.info(`${chalk.cyan('Discord')}: ${chalk.yellow('API /api/particle/trackerone')} triggered message send to channel "` + message + `"`);
-                //Prepare for status call on Discord
-                last_alert_device_id = req.body.coreid;
-            } else {
-                spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid but not past the alert frequency, skipping alert`);
+        if (check_reason !== "lock") {
+            //Get device data
+            let device = devices_storage.get(req.body.coreid);
+            if (device === undefined) {
+                device = {};
+                spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Creating new device in devices.json`);
             }
-        } else {
-            spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event does not match a valid trigger reason, skipping alert`);
-        }
+            device.data = JSON.parse(req.body.data);
 
-        //Update device data
-        devices_storage.set(req.body.coreid, {
-            device_name: device.device_name,
-            data: device.data,
-            last_data_update: moment(req.body.published_at),
-            last_alert_update: device.last_alert_update,
-            alert_freq_min: device.alert_freq_min
-        });
-        spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Updated data for device`);
-        res.status(200).end();
+            //Make sure device_name, alert_freq_min, last_alert_update exists for device
+            if (device.alert_freq_min === undefined) {
+                device.alert_freq_min = 60;
+                spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) "alert_freq_min" set to default: ` + device.alert_freq_min);
+            }
+            if (device.device_name === undefined) {
+                device.device_name = req.body.coreid;
+                spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) "device_name" set to default: ` + device.device_name);
+            }
+            if (device.last_alert_update === undefined) {
+                device.last_alert_update = moment();
+                spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) "last_alert_update" set to default: ` + device.last_alert_update);
+            }
+
+            //If the trigger reason is valid, check to see if we can send an alert
+            if (check_reason !== "false") {
+                //Send an alert if the freq has passed
+                if (moment().isAfter(moment(device.last_alert_update).add(device.alert_freq_min, 'm'))) {
+                    device.last_alert_update = moment();
+                    spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid and is past the alert frequency, sending alert`);
+                    //Send message to Discord
+                    let message = '@everyone ' + device.device_name + check_reason + moment().format('MM/DD/YY h:mm:ss a');
+                    bot.createMessage(config_storage.get('discord_bot_channel'), message);
+                    spinner.info(`${chalk.cyan('Discord')}: ${chalk.yellow('API /api/particle/trackerone')} triggered message send to channel "` + message + `"`);
+                    //Prepare for status call on Discord
+                    last_alert_device_id = req.body.coreid;
+                } else {
+                    spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid but not past the alert frequency, skipping alert`);
+                }
+            } else {
+                spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event does not match a valid trigger reason, skipping alert`);
+            }
+
+            //Update device data
+            devices_storage.set(req.body.coreid, {
+                device_name: device.device_name,
+                data: device.data,
+                last_data_update: moment(req.body.published_at),
+                last_alert_update: device.last_alert_update,
+                alert_freq_min: device.alert_freq_min
+            });
+            spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Updated data for device`);
+            res.status(200).end();
+        } else {
+            spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: Ignoring GPS lock trigger, not updating data`);
+            res.status(200).end();
+        }
     } else {
         spinner.warn(`${chalk.yellow('API /api/particle/trackerone')}: Unauthorized POST request`);
         res.status(403).end();
