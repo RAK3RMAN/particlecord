@@ -93,20 +93,23 @@ bot.on('messageCreate', async (msg) => {
     //Split message into components
     let parts = msg.content.split(' ');
     if (parts[0] === pre + 'help') {
+        spinner.info(`${chalk.cyan('Discord')}: Generated response to "` + pre + `help" command`);
         try {
             await msg.channel.createMessage('**Particlecord commands**\n' +
                 '> ' + pre + 'help: Displays all Particlecord commands\n' +
                 '> ' + pre + 'status: Returns more details from the last alert\n' +
+                '> ' + pre + 'devices: Returns all known devices\n' +
                 '> ' + pre + 'details <device_id>: Returns all details for a Particle device_id\n' +
-                '> ' + pre + 'alert_freq <freq_in_min>: Sets the alert frequency in terms of minutes, use 0 for verbose alerts\n' +
+                '> ' + pre + 'alert_freq <device_id> <freq_in_min>: Sets the alert frequency in terms of minutes for a device, use 0 for verbose alerts\n' +
                 '> ' + pre + 'name <device_id> <friendly_name>: Changes the friendly name for a Particle device_id\n');
         } catch (err) {
             spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
         }
     } else if (parts[0]=== pre + 'status') {
+        spinner.info(`${chalk.cyan('Discord')}: Generated response to "` + pre + `status" command`);
         try {
             if (last_alert_device_id === '') {
-                await msg.channel.createMessage('An alert has not occurred yet');
+                await msg.channel.createMessage('Please wait for an alert to occur');
             } else {
                 await msg.channel.createMessage(get_status(last_alert_device_id));
             }
@@ -114,12 +117,95 @@ bot.on('messageCreate', async (msg) => {
             spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
             console.log(err);
         }
+    } else if (parts[0]=== pre + 'devices') {
+        spinner.info(`${chalk.cyan('Discord')}: Generated response to "` + pre + `devices" command`);
+        let devices_payload = "";
+        let all_devices = JSON.parse(devices_storage.json(null, 2));
+        for (let i in all_devices){
+            if (all_devices.hasOwnProperty(i)) {
+                devices_payload += '> ' + i + ' | ' + all_devices[i].device_name + ' | ' + moment(all_devices[i].last_data_update).format('MM/DD/YY [at] h:mm:ss a') + '\n';
+            }
+        }
+        try {
+            await msg.channel.createMessage('**Devices** (device_id | friendly_name | last_data_update)\n' + devices_payload);
+        } catch (err) {
+            spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+            console.log(err);
+        }
     } else if (parts[0] === pre + 'details') {
+        spinner.info(`${chalk.cyan('Discord')}: Generated response to "` + pre + `details" command`);
         try {
             await msg.channel.createMessage(get_status(parts[1]));
         } catch (err) {
             spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
             console.log(err);
+        }
+    } else if (parts[0] === pre + 'alert_freq') {
+        //Make sure device_id exists
+        if (devices_storage.has(parts[1]) && parts[1] !== undefined) {
+            let device = devices_storage.get(parts[1]);
+            //Check to make sure the freq_in_min value is valid
+            if (parts[2] >= 0) {
+                //Update device data
+                devices_storage.set(parts[1], {
+                    device_name: device.device_name,
+                    data: device.data,
+                    last_data_update: device.last_data_update,
+                    last_alert_update: device.last_alert_update,
+                    alert_freq_min: parts[2]
+                });
+                spinner.info(`${chalk.cyan('Discord')}: (id:` + parts[1] + `) Updated alert_freq to ` + parts[2] + ` for device due to "` + pre + `alert_freq" command`);
+                try {
+                    await msg.channel.createMessage(device.device_name + ' (' + parts[1] + ') will now send alerts at a maximum of every ' + parts[2] + ' mins');
+                } catch (err) {
+                    spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+                    console.log(err);
+                }
+            } else {
+                spinner.fail(`${chalk.cyan('Discord')}: <freq_in_min> must be greater than or equal to 0, responding with error`);
+                try {
+                    await msg.channel.createMessage('ERROR: <freq_in_min> must be greater than or equal to 0, check ' + pre + 'help');
+                } catch (err) {
+                    spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+                    console.log(err);
+                }
+            }
+        } else {
+            spinner.fail(`${chalk.cyan('Discord')}: <device_id> does not exist, responding with error`);
+            try {
+                await msg.channel.createMessage('ERROR: Particle <device_id> does not exist in database');
+            } catch (err) {
+                spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+                console.log(err);
+            }
+        }
+    } else if (parts[0] === pre + 'name') {
+        //Make sure device_id exists
+        if (devices_storage.has(parts[1]) && parts[1] !== undefined) {
+            let device = devices_storage.get(parts[1]);
+            //Update device data
+            devices_storage.set(parts[1], {
+                device_name: parts[2],
+                data: device.data,
+                last_data_update: device.last_data_update,
+                last_alert_update: device.last_alert_update,
+                alert_freq_min: device.alert_freq_min
+            });
+            spinner.info(`${chalk.cyan('Discord')}: (id:` + parts[1] + `) Updated device_name to ` + parts[2] + ` for device due to "` + pre + `name" command`);
+            try {
+                await msg.channel.createMessage(parts[2] + ' (' + parts[1] + ') was successfully renamed');
+            } catch (err) {
+                spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+                console.log(err);
+            }
+        } else {
+            spinner.fail(`${chalk.cyan('Discord')}: <device_id> does not exist, responding with error`);
+            try {
+                await msg.channel.createMessage('ERROR: Particle <device_id> does not exist in database');
+            } catch (err) {
+                spinner.fail(`${chalk.cyan('Discord')}: Failed to send message`);
+                console.log(err);
+            }
         }
     }
 });
@@ -139,9 +225,11 @@ function get_status(device_id) {
             '> Altitude | ' + device.data.loc.alt + " m\n" +
             '> Heading | ' + device.data.loc.hd + "°\n" +
             '> Temp | ' + (Math.round(((device.data.loc.temp*(9/5))+32)*100)/100) + "°F\n" +
+            '> Last Heard | ' + moment(device.last_data_update).format('MM/DD/YY [at] h:mm:ss a') + "\n" +
+            '> Alert Frequency | At most every ' + device.alert_freq_min + " mins\n" +
             ' http://maps.apple.com/maps?q=' + device.data.loc.lat + ',' + device.data.loc.lon + '\n';
     } else {
-        return 'Particle device_id does not exist'
+        return 'ERROR: Particle <device_id> does not exist in database'
     }
 }
 
@@ -200,7 +288,7 @@ app.post("/api/particle/trackerone", (req, res) => {
                 device.last_alert_update = moment();
                 spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid and is past the alert frequency, sending alert`);
                 //Send message to Discord
-                let message = device.device_name + check_reason + moment().format('MM/DD/YY h:mm:ss a');
+                let message = '@everyone ' + device.device_name + check_reason + moment().format('MM/DD/YY h:mm:ss a');
                 bot.createMessage(config_storage.get('discord_bot_channel'), message);
                 spinner.info(`${chalk.cyan('Discord')}: ${chalk.yellow('API /api/particle/trackerone')} triggered message send to channel "` + message + `"`);
                 //Prepare for status call on Discord
