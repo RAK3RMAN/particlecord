@@ -68,7 +68,7 @@ if (!devices_storage.has('last_alert_device_id') || devices_storage.get('last_al
 }
 
 //Exit if the config values are not set properly (and not in testing env)
-if (invalid_config && process.env.testENV || process.argv[2] !== "test") {
+if (invalid_config && (process.env.testENV || process.argv[2] !== "test")) {
     process.exit(1);
 } else {
     spinner.succeed('Config values have been propagated');
