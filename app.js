@@ -23,7 +23,7 @@ console.log(chalk.white('--> Description: ' + pkg.description));
 console.log(chalk.white('--> Github: ' + pkg.homepage + '\n'));
 
 //Setup config.json and devices.json database
-spinner.start('Checking configuration');
+spinner.start('Checking configuration values');
 let config_storage = new dataStore({path: './config.json'});
 let devices_storage = new dataStore({path: './devices.json'});
 let invalid_config = false;
@@ -45,24 +45,27 @@ if (!config_storage.has('discord_bot_channel') || config_storage.get('discord_bo
 //Config value: discord_bot_prefix
 if (!config_storage.has('discord_bot_prefix') || config_storage.get('discord_bot_prefix') === '') {
     config_storage.set('discord_bot_prefix', '!');
-    spinner.warn('"discord_bot_prefix" value in config.json set to default: !');
+    spinner.warn('"discord_bot_prefix" value in config.json set to default: "!"');
 }
 
 //Config value: webhook_secret
 if (!config_storage.has('webhook_secret') || config_storage.get('webhook_secret') === '') {
     let new_secret = uuidv4();
     config_storage.set('webhook_secret', new_secret);
-    spinner.warn('"webhook_secret" value in config.json set default: ' + new_secret);
+    spinner.warn('"webhook_secret" value in config.json set default: "' + new_secret + '"');
 }
 
 //Config value: api_port
 if (!config_storage.has('api_port') || config_storage.get('api_port') === '') {
     config_storage.set('api_port', 3000);
-    spinner.warn('"api_port" value in config.json set to default: 3000');
+    spinner.warn('"api_port" value in config.json set to default: "3000"');
 }
 
-//Create variables for pass-through between API and Discord bot
-let last_alert_device_id = '';
+//Devices config value: last_alert_device_id
+if (!devices_storage.has('last_alert_device_id') || devices_storage.get('last_alert_device_id') === '') {
+    devices_storage.set('last_alert_device_id', 'unknown');
+    spinner.warn('"last_alert_device_id" value in devices.json set to default: "unknown"');
+}
 
 //Exit if the config values are not set properly (and not in testing env)
 if (invalid_config && process.env.testENV || process.argv[2] !== "test") {
@@ -111,10 +114,10 @@ bot.on('messageCreate', async (msg) => {
         spinner.start(`${chalk.cyan('Discord')}: Sending message to "` + pre + `status" command`);
         //Send message to Discord channel, catch error if thrown
         try {
-            if (last_alert_device_id === '') {
+            if (devices_storage.get('last_alert_device_id') === '') {
                 await msg.channel.createMessage('Please wait for an alert to occur');
             } else {
-                await msg.channel.createMessage(get_status(last_alert_device_id));
+                await msg.channel.createMessage(get_status(devices_storage.get('last_alert_device_id')));
             }
             spinner.succeed(`${chalk.cyan('Discord')}: Sent message to "` + pre + `status" command`);
         } catch (err) {
@@ -316,7 +319,7 @@ app.post("/api/particle/trackerone", (req, res) => {
                 bot.createMessage(config_storage.get('discord_bot_channel'), message);
                 spinner.info(`${chalk.cyan('Discord')}: ${chalk.yellow('API /api/particle/trackerone')} triggered message send to channel "` + message + `"`);
                 //Prepare for status call on Discord
-                last_alert_device_id = req.body.coreid;
+                devices_storage.set('last_alert_device_id', req.body.coreid);
             } else {
                 spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: (id:` + req.body.coreid + `) Event trigger reason is valid but not past the alert frequency, skipping alert`);
             }
@@ -341,14 +344,14 @@ app.post("/api/particle/trackerone", (req, res) => {
 })
 
 //Start express on defined port
-spinner.start('Attempting to start API webserver');
+spinner.start('Attempting to start API http webserver');
 app.listen(config_storage.get('api_port'), function () {
     //Successfully started webserver
     spinner.succeed('API http webserver running on port ' + config_storage.get('api_port'));
     //Exit if we are in testing env
     if (process.env.testENV || process.argv[2] === "test") {
-        spinner.info(`${chalk.blue('TEST MODE')}: Exiting program`);
-        process.exit(1);
+        spinner.info(`${chalk.blue('TEST MODE')}: Stopping program with exit code 0`);
+        process.exit(0);
     } else {
         //Start Discord bot
         spinner.start('Attempting to connect to Discord API');
