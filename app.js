@@ -17,10 +17,6 @@ const pkg = require('./package.json');
 const ora = require('ora');
 const spinner = ora('');
 
-//Initialize exit options for testing environments
-let exitOpt = require('./exit_options.js');
-setTimeout(exitOpt.testCheck, 3000);
-
 //Print header to console
 console.log(chalk.blue.bold('\nParticlecord v' + pkg.version + ' | ' + pkg.author));
 console.log(chalk.white('--> Description: ' + pkg.description));
@@ -68,8 +64,8 @@ if (!config_storage.has('api_port') || config_storage.get('api_port') === '') {
 //Create variables for pass-through between API and Discord bot
 let last_alert_device_id = '';
 
-//Exit if the config values are not set properly
-if (invalid_config) {
+//Exit if the config values are not set properly (and not in testing env)
+if (invalid_config && process.env.testENV || process.argv[2] !== "test") {
     process.exit(1);
 } else {
     spinner.succeed('Config values have been propagated');
@@ -349,8 +345,14 @@ spinner.start('Attempting to start API webserver');
 app.listen(config_storage.get('api_port'), function () {
     //Successfully started webserver
     spinner.succeed('API http webserver running on port ' + config_storage.get('api_port'));
-    //Start Discord bot
-    spinner.start('Attempting to connect to Discord API');
-    bot.connect();
+    //Exit if we are in testing env
+    if (process.env.testENV || process.argv[2] === "test") {
+        spinner.info(`${chalk.blue('TEST MODE')}: Exiting program`);
+        process.exit(1);
+    } else {
+        //Start Discord bot
+        spinner.start('Attempting to connect to Discord API');
+        bot.connect();
+    }
 })
 //End of API Webhooks - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
