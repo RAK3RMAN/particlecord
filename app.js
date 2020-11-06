@@ -24,8 +24,8 @@ console.log(chalk.white('--> Github: ' + pkg.homepage + '\n'));
 
 //Setup config.json and devices.json database
 spinner.start('Checking configuration values');
-let config_storage = new dataStore({path: './config.json'});
-let devices_storage = new dataStore({path: './devices.json'});
+const config_storage = new dataStore({path: './config.json'});
+const devices_storage = new dataStore({path: './devices.json'});
 let invalid_config = false;
 
 //Config value: discord_bot_token
@@ -128,8 +128,8 @@ bot.on('messageCreate', async (msg) => {
         spinner.start(`${chalk.cyan('Discord')}: Sending message to "` + pre + `devices" command`);
         let devices_payload = "";
         let all_devices = JSON.parse(devices_storage.json(null, 2));
-        for (let i in all_devices){
-            if (all_devices.hasOwnProperty(i)) {
+        for (let i in all_devices) {
+            if (all_devices.hasOwnProperty(i) && i !== "last_alert_device_id") {
                 devices_payload += '> ' + i + ' | ' + all_devices[i].device_name + ' | ' + moment(all_devices[i].last_data_update).format('h:mm:ss a [on] MM/DD/YY Z [UTC]') + '\n';
             }
         }
