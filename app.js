@@ -344,17 +344,17 @@ app.post("/api/particle/trackerone", (req, res) => {
 })
 
 //Start express on defined port
-spinner.start('Attempting to start API http webserver');
+spinner.start(`${chalk.yellow('API')}: Attempting to start API http webserver`);
 app.listen(config_storage.get('api_port'), function () {
     //Successfully started webserver
-    spinner.succeed('API http webserver running on port ' + config_storage.get('api_port'));
+    spinner.succeed(`${chalk.yellow('API')}: API http webserver listening on port ` + config_storage.get('api_port'));
     //Exit if we are in testing env
     if (process.env.testENV || process.argv[2] === "test") {
-        spinner.info(`${chalk.blue('TEST MODE')}: Stopping program with exit code 0`);
+        spinner.info(`${chalk.red('TEST MODE')}: Stopping program with exit code 0`);
         process.exit(0);
     } else {
         //Start Discord bot
-        spinner.start('Attempting to connect to Discord API');
+        spinner.start(`${chalk.cyan('Discord')}: Attempting to connect to Discord API`);
         bot.connect();
     }
 })
