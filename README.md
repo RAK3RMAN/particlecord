@@ -2,15 +2,15 @@
 [![Build Status](https://travis-ci.org/RAK3RMAN/particlecord.svg?branch=main)](https://travis-ci.org/RAK3RMAN/particlecord)
 ![Language](https://img.shields.io/badge/language-Node.js-informational.svg?style=flat)
 
-A Discord bot that sends event-based alerts from Particle.io devices
+A Discord notification bot that monitors Particle.io events using Node.js
+
+![Home UI](demo.png)
 
 ## Purpose
-Particlecord listens for events from Particle.io devices and parses this data into manageable alerts.
-Think of Particlecord as an "API middleman" that links together a real-time data stream from Particle.io and sending push notifications through Discord.
-A large portion of this project is built around Particle events from Particle's Tracker One.
-Tracker One is an electronics package that monitors the location of an asset using GPS and motion alerts.
-Particlecord leverages these events by sending push notifications to a Discord channel anytime Tracker One moves.
-Particlecord can handle multiple named devices and is easily customizable to monitor any type of event.
+Particlecord listens to the data stream from Particle.io devices and notifies the user when a particular event occurs.
+Think of Particlecord as an "API middleman" that filters a real-time data stream from Particle.io and sends smart push notifications through Discord.
+Devices can also be managed using the Discord bot by setting friendly names, changing alert frequencies, and outputting the status of any device.
+Particlecord can also easily adapt to your project by modifying the API webhooks in app.js.
 
 ## Install
 As easy as 1, 2, 3.
