@@ -261,6 +261,12 @@ bot.on('error', err => {
 const app = express();
 app.use(bodyParser.json());
 
+// Handle landing page
+app.get("/", (req, res) => {
+    res.redirect('https://github.com/rak3rman/particlecord');
+    spinner.info(`${chalk.yellow('API /')}: Received GET request, redirecting to Github page`);
+})
+
 // Handle post requests for Particle Tracker One events
 app.post("/api/particle/trackerone", (req, res) => {
     spinner.info(`${chalk.yellow('API /api/particle/trackerone')}: Received POST request, parsing data`);
